@@ -6,7 +6,8 @@
       "Bash(pnpm build *)",
       "Bash(pnpm typeorm-ts-node-commonjs *)",
       "Bash(npx tsc *)",
-      "Bash(pnpm audit *)"
+      "Bash(pnpm audit *)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(48\\).toString\\('base64'\\)\\)\")"
     ]
   }
 }

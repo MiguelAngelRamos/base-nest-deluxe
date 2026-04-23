@@ -1,9 +1,10 @@
 // src/auth/strategies/jwt.strategy.ts
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import type Redis from 'ioredis';
 import { UsersService } from '../../users/users.service';
 
 // Payload que metemos dentro del access token
@@ -14,14 +15,20 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role: string;
+  // jti (JWT ID) — identificador único; prerequisito para blocklist en logout.
+  jti: string;
 }
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
+    @Inject('VALKEY_CLIENT')
+    private readonly valkeyClient: Redis,
   ) {
     // OWASP A02:2025 — Cryptographic Failures
     // El secreto se lee del .env en tiempo de construcción
@@ -61,6 +68,24 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     if (!user.isActive) {
       throw new UnauthorizedException('Usuario desactivado');
+    }
+
+    // [SECURE-FIX] Blocklist check — si el jti está en Valkey el token
+    // fue revocado explícitamente en logout. OWASP A07:2021.
+    // Fail-open deliberado: si Valkey no responde, dejamos pasar.
+    // isActive sigue siendo la defensa principal — un usuario desactivado
+    // no puede usar su token aunque la blocklist esté caída.
+    // OWASP A09:2021 — registrar el fallo para alertar si es recurrente.
+    try {
+      const blocked = await this.valkeyClient.get(`blocklist:at:${payload.jti}`);
+      if (blocked) {
+        throw new UnauthorizedException('Token revocado');
+      }
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      this.logger.error(
+        `Valkey blocklist check fallido — fail-open: ${(err as Error).message}`,
+      );
     }
 
     return {

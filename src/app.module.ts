@@ -4,15 +4,17 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 //* [SECURE-FIX V4] JwtAuthGuard se registra como APP_GUARD global
 //* más abajo — por eso se importa aquí además del AuthModule.
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { ValkeyModule } from './valkey/valkey.module';
 
 // Importamos las configuraciones desde el barrel export
-import { appConfig, databaseConfig, jwtConfig } from './config';
+import { appConfig, databaseConfig, jwtConfig, valkeyConfig } from './config';
 import { UsersModule } from './users/users.module';
 import { PatientsModule } from './patients/patients.module';
 import { DoctorsModule } from './doctors/doctors.module';
@@ -33,7 +35,7 @@ import { AuthModule } from './auth/auth.module';
 
       // load — array de configuraciones con namespace
       // cada registerAs() que creamos se registra aquí
-      load: [appConfig, databaseConfig, jwtConfig],
+      load: [appConfig, databaseConfig, jwtConfig, valkeyConfig],
 
       // envFilePath — ruta al archivo .env
       // por defecto busca .env en la raíz del proyecto
@@ -117,6 +119,15 @@ import { AuthModule } from './auth/auth.module';
         limit: 60,
       },
     ]),
+
+    // CacheModule global — store en memoria para uso general.
+    // La blocklist usa ioredis directamente vía ValkeyModule.
+    CacheModule.register({ isGlobal: true }),
+
+    // ValkeyModule global — provee VALKEY_CLIENT (ioredis) para
+    // la blocklist de access tokens en logout. Fail-open si Valkey
+    // no está disponible al arrancar. OWASP A07:2021.
+    ValkeyModule,
 
     UsersModule,
 

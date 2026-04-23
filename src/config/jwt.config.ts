@@ -13,6 +13,7 @@ const MIN_SECRET_LENGTH = 32;
 //* pero deja constancia en consola de que hay que rotar.
 //! [PROD] Rotar ambos secretos antes de desplegar:
 //!        openssl rand -base64 48
+//!        node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
 //!        y escribirlos en JWT_SECRET / JWT_REFRESH_SECRET del .env
 //!        de producción. NUNCA reutilizar los valores de dev/staging.
 function assertSecret(name: string, value: string | undefined): string {

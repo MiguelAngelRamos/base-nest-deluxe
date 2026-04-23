@@ -202,7 +202,12 @@ export class AuthController {
     @Req() req: Request & { user: { id: string } },
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.logout(req.user.id);
+    // Extraemos el Bearer para pasarlo a la blocklist de Valkey.
+    // El guard ya verificó su validez — aquí solo lo parseamos.
+    const authHeader = (req.headers as Record<string, string>)['authorization'] ?? '';
+    const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
+    await this.authService.logout(req.user.id, accessToken);
     //* [SECURE-FIX V5] clearCookie replica TODOS los flags con los
     //* que se seteó la cookie. Path es lo único imprescindible para
     //* que el navegador la identifique, pero mantener httpOnly/secure/

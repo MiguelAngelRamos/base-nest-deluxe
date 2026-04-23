@@ -1,6 +1,7 @@
 // src/auth/auth.service.ts
 
 import {
+  Inject,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -10,6 +11,8 @@ import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as argon2 from 'argon2';
+import { randomUUID } from 'node:crypto';
+import type Redis from 'ioredis';
 import { User, UserRole } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
@@ -40,6 +43,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @Inject('VALKEY_CLIENT')
+    private readonly valkeyClient: Redis,
   ) {}
 
   // ─────────────────────────────────────────────
@@ -162,11 +167,35 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
-  async logout(userId: string): Promise<void> {
+  // [SECURE-FIX] Blocklist del access token en Valkey — cierra la
+  // ventana de 15min en la que un token robado seguiría siendo válido
+  // después de que el usuario legítimo haga logout.
+  // OWASP A07:2021 Identification and Authentication Failures.
+  async logout(userId: string, accessToken: string): Promise<void> {
+    // decode() no verifica firma — solo extrae el payload. El token
+    // ya fue validado por JwtAuthGuard antes de llegar aquí.
+    const decoded = this.jwtService.decode<{ jti?: string; exp?: number }>(accessToken);
+
+    if (decoded?.jti && decoded?.exp) {
+      // TTL = segundos hasta expiración natural del token.
+      // La entrada en Valkey se auto-elimina al expirar — sin acumulación.
+      const ttl = decoded.exp - Math.floor(Date.now() / 1000);
+
+      if (ttl > 0) {
+        try {
+          // key namespaced para evitar colisiones con otras claves de Valkey
+          await this.valkeyClient.set(`blocklist:at:${decoded.jti}`, '1', 'EX', ttl);
+        } catch (err) {
+          // Fail-open: el refresh se invalida igual; solo el access token
+          // quedará activo hasta su expiración natural. OWASP A09:2021.
+          this.logger.error(
+            `Blocklist Valkey error en logout: ${(err as Error).message}`,
+          );
+        }
+      }
+    }
+
     // Invalidamos el refresh token seteando el hash a null
-    // El access token sigue válido hasta su expiración (15min)
-    // Para revocación inmediata de access tokens se necesitaría
-    // una lista de revocación — fuera del alcance de este módulo
     await this.userRepository.update(userId, { refreshTokenHash: null });
     this.logger.log(`Logout para userId: ${userId}`);
   }
@@ -174,10 +203,15 @@ export class AuthService {
   // issueTokens — firma access + refresh y guarda el hash del
   // refresh en DB. Método privado reutilizado por register/login/refresh
   private async issueTokens(user: User): Promise<AuthTokens> {
+    // [SECURE-FIX] jti (JWT ID) — identificador único por token.
+    // Prerequisito para blocklist en logout: permite invalidar un
+    // access token específico sin esperar a que expire.
+    // OWASP A07:2021 Identification and Authentication Failures.
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      jti: randomUUID(),
     };
 
     // Config de expiración como string ('15m', '7d') — @nestjs/jwt
