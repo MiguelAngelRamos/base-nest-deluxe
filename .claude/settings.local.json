@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm migration:generate src/database/migrations/AddRefreshTokenToUser)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm build *)",
+      "Bash(pnpm typeorm-ts-node-commonjs *)",
+      "Bash(npx tsc *)",
+      "Bash(pnpm audit *)"
+    ]
+  }
+}
