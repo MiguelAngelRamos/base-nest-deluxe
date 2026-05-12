@@ -54,6 +54,25 @@ docker run --rm `
 | `--security-opt=no-new-privileges` | Impide escalar privilegios vía setuid/setgid |
 | `--name clinic-api` | Nombre fijo para poder referenciar el contenedor |
 
+### En background (modo daemon)
+
+Igual que el hardening completo, pero con `-d` para que el contenedor corra desprendido de la terminal:
+
+```powershell
+docker run --rm -d --name clinic-api `
+  -p 3000:3000 `
+  --env-file .env `
+  --read-only --tmpfs /tmp `
+  --cap-drop=ALL --security-opt=no-new-privileges `
+  clinic-api:latest
+```
+
+| Flag añadido | Por qué |
+|---|---|
+| `-d` | Detached — devuelve el prompt enseguida; el contenedor sigue corriendo |
+
+> Para ver qué hace usa `docker logs -f clinic-api` (sección 3).
+
 ---
 
 ## 3. Verificar que funciona

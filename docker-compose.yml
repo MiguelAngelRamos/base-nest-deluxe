@@ -1,0 +1,108 @@
+# =============================================================================
+#  docker-compose.yml — Clinic API stack
+#  Servicios: api (NestJS) · postgres · valkey
+#
+#  Variables sensibles: vienen del .env en la raíz (nunca entran a la imagen).
+#  DB_HOST y VALKEY_HOST se sobreescriben con nombres de servicio Docker para
+#  que la API resuelva por DNS interno en lugar de las IPs físicas del .env.
+#
+#  Comandos útiles:
+#    docker compose up -d            levantar todo en background
+#    docker compose up -d --build    rebuild de imagen antes de levantar
+#    docker compose logs -f api      tail de logs de la API
+#    docker compose down             detener y eliminar contenedores
+#    docker compose down -v          ídem + destruir volúmenes de datos
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  #  API — NestJS
+  # ---------------------------------------------------------------------------
+  api:
+    build: .
+    image: clinic-api:latest
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      # .env tiene IPs físicas; aquí se reemplazan por nombres de servicio
+      # que Docker resuelve vía DNS interno de la red clinic-net.
+      DB_HOST: postgres
+      VALKEY_HOST: valkey
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    networks:
+      - clinic-net
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  #  PostgreSQL 16
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - clinic-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  #  Valkey 8 (Redis-compatible) — blocklist de access tokens JWT
+  # ---------------------------------------------------------------------------
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --requirepass ${VALKEY_PASSWORD}
+    environment:
+      # Necesario para que el healthcheck (shell del contenedor) lo expanda.
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD}
+    volumes:
+      - valkey-data:/data
+    networks:
+      - clinic-net
+    healthcheck:
+      # $$VALKEY_PASSWORD: $$ escapa la expansion de compose; el shell del
+      # contenedor lo expande como $VALKEY_PASSWORD desde el env del servicio.
+      test: ["CMD-SHELL", "valkey-cli -a $$VALKEY_PASSWORD ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+# =============================================================================
+#  Red interna — solo la API expone puerto al host (via ports arriba).
+#  postgres y valkey no son accesibles desde fuera del stack.
+# =============================================================================
+networks:
+  clinic-net:
+    driver: bridge
+
+# =============================================================================
+#  Volúmenes persistentes — los datos sobreviven `docker compose down`.
+#  Solo se borran con `docker compose down -v`.
+# =============================================================================
+volumes:
+  postgres-data:
+  valkey-data:
