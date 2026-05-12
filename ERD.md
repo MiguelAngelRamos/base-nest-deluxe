@@ -25,6 +25,8 @@ erDiagram
         enum gender "male | female | other, NULLABLE"
         varchar phone "NULLABLE"
         varchar address "NULLABLE"
+        timestamp created_at "DEFAULT NOW()"
+        timestamp updated_at "DEFAULT NOW() ON UPDATE"
     }
 
     doctors {
@@ -34,17 +36,21 @@ erDiagram
         varchar last_name "NOT NULL"
         varchar license_number UK "UNIQUE NOT NULL"
         varchar phone "NULLABLE"
+        timestamp created_at "DEFAULT NOW()"
+        timestamp updated_at "DEFAULT NOW() ON UPDATE"
     }
 
     specialties {
         uuid id PK "PRIMARY KEY, UUID v4"
         varchar name UK "UNIQUE NOT NULL"
         varchar description "NULLABLE"
+        timestamp created_at "DEFAULT NOW()"
+        timestamp updated_at "DEFAULT NOW() ON UPDATE"
     }
 
     doctor_specialties {
-        uuid doctor_id PK,FK "FK → doctors.id, CASCADE DELETE"
-        uuid specialty_id PK,FK "FK → specialties.id, CASCADE DELETE"
+        uuid doctor_id PK,FK "FK → doctors.id, ON DELETE CASCADE"
+        uuid specialty_id PK,FK "FK → specialties.id, ON DELETE NO ACTION"
     }
 
     appointments {
@@ -55,7 +61,9 @@ erDiagram
         time start_time "NOT NULL"
         time end_time "NOT NULL"
         enum status "scheduled | confirmed | cancelled | completed | no_show"
-        text notes "NULLABLE, MAX 2000 chars"
+        text notes "NULLABLE, sin límite en BD (type: text)"
+        timestamp created_at "DEFAULT NOW()"
+        timestamp updated_at "DEFAULT NOW() ON UPDATE"
     }
 
     users ||--o| patients : "OneToOne (user_id)"
@@ -91,4 +99,4 @@ Los enums se almacenan como `varchar` / tipo nativo de PostgreSQL según la conf
 
 ### Tabla intermedia `doctor_specialties`
 
-Es una tabla pura de unión (sin columnas adicionales) generada por TypeORM para la relación `@ManyToMany` entre `Doctor` y `Specialty`. Ambas FKs son `PRIMARY KEY` compuesto con `ON DELETE CASCADE`.
+Es una tabla pura de unión (sin columnas adicionales) generada por TypeORM para la relación `@ManyToMany` entre `Doctor` y `Specialty`. Las dos FKs forman el `PRIMARY KEY` compuesto, pero tienen comportamientos de borrado distintos: `doctor_id` tiene `ON DELETE CASCADE` (si se elimina el médico, sus filas en la tabla intermedia se borran automáticamente) y `specialty_id` tiene `ON DELETE NO ACTION` (no se puede borrar una especialidad mientras tenga médicos asignados).

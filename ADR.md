@@ -144,13 +144,14 @@ Implementar soft delete mediante el campo `is_active: boolean DEFAULT true` en l
 `@nestjs/config` permite centralizar la configuración, pero sin estructura puede volverse un objeto plano difícil de navegar y propenso a typos en las claves de acceso.
 
 **Decisión:**
-Crear tres archivos de configuración con namespaces explícitos (`app`, `database`, `jwt`) usando `registerAs()` de `@nestjs/config`. Cada archivo valida sus propias variables de entorno (incluyendo validaciones de seguridad como la longitud mínima de secretos JWT). Un barrel export en `config/index.ts` centraliza las importaciones. El acceso se hace con `configService.get<T>('namespace.key')`.
+Crear cuatro archivos de configuración con namespaces explícitos (`app`, `database`, `jwt`, `valkey`) usando `registerAs()` de `@nestjs/config`. Cada archivo valida sus propias variables de entorno (incluyendo validaciones de seguridad como la longitud mínima de secretos JWT). Un barrel export en `config/index.ts` centraliza las importaciones. El acceso se hace con `configService.get<T>('namespace.key')`.
 
 **Consecuencias:**
 
 - *Positivo:* Las claves de configuración son descubribles y tipadas (autocompletado en IDE).
 - *Positivo:* La validación de secretos en `jwt.config.ts` implementa un patrón *fail-fast*: la aplicación no arranca en producción con secretos débiles.
 - *Positivo:* Cada módulo puede importar solo el namespace que necesita.
+- *Positivo:* El namespace `valkey` centraliza las variables de conexión a Valkey/Redis (`VALKEY_HOST`, `VALKEY_PORT`, `VALKEY_PASSWORD`) separándolas del resto de la configuración.
 - *Negativo:* Añade boilerplate comparado con `process.env.VARIABLE` directamente.
 
 ---
@@ -163,7 +164,7 @@ Crear tres archivos de configuración con namespaces explícitos (`app`, `databa
 La documentación Swagger expone la superficie de ataque completa de la API (todos los endpoints, parámetros y schemas). Dejarla pública o habilitada en producción facilita el reconocimiento a atacantes.
 
 **Decisión:**
-Swagger solo se inicializa cuando `NODE_ENV !== 'production'`. La ruta `/api/docs` se protege con `express-basic-auth` usando credenciales definidas en las variables de entorno `SWAGGER_USER` y `SWAGGER_PASSWORD`. El acceso a endpoints autenticados dentro de Swagger requiere además un Bearer token JWT válido.
+Swagger solo se inicializa cuando `NODE_ENV === 'development'` (condición estricta, no simplemente "distinto de production"). La ruta `/api/docs` se protege con `express-basic-auth` usando credenciales definidas en las variables de entorno `SWAGGER_USER` y `SWAGGER_PASSWORD`. El acceso a endpoints autenticados dentro de Swagger requiere además un Bearer token JWT válido.
 
 **Consecuencias:**
 

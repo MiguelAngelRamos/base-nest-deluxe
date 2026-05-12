@@ -9,9 +9,11 @@ graph TD
     ConfigModule["ConfigModule\n(global: true)\n@nestjs/config"]
     TypeOrmModule["TypeOrmModule\n(forRootAsync)\nPostgreSQL"]
     ThrottlerModule["ThrottlerModule\n60 rpm global"]
+    CacheModule["CacheModule\n(global: true)\nstore en memoria"]
+    ValkeyModule["ValkeyModule\n(@Global)\nprovee VALKEY_CLIENT\nblocklist JWT logout"]
 
     UsersModule["UsersModule\nexporta: UsersService"]
-    AuthModule["AuthModule\nexporta: JwtAuthGuard\nPassportModule, JwtModule"]
+    AuthModule["AuthModule\nexporta: AuthService"]
     PatientsModule["PatientsModule\nexporta: PatientsService"]
     DoctorsModule["DoctorsModule\nexporta: DoctorsService"]
     SpecialtiesModule["SpecialtiesModule\nexporta: SpecialtiesService"]
@@ -20,6 +22,8 @@ graph TD
     AppModule --> ConfigModule
     AppModule --> TypeOrmModule
     AppModule --> ThrottlerModule
+    AppModule --> CacheModule
+    AppModule --> ValkeyModule
     AppModule --> UsersModule
     AppModule --> AuthModule
     AppModule --> PatientsModule
@@ -36,6 +40,7 @@ graph TD
 
     ConfigModule -->|"ConfigService global"| AuthModule
     ConfigModule -->|"ConfigService global"| TypeOrmModule
+    ConfigModule -->|"ConfigService global"| ValkeyModule
     ConfigModule -->|"ConfigService global"| UsersModule
     ConfigModule -->|"ConfigService global"| PatientsModule
     ConfigModule -->|"ConfigService global"| DoctorsModule
@@ -102,6 +107,11 @@ graph LR
         APM_C["AppointmentsController"]
         APM_R --> APM_S --> APM_C
     end
+
+    subgraph ValkeyModule
+        direction TB
+        VM_C["VALKEY_CLIENT\n(ioredis, @Global)\nblocklist JWT"]
+    end
 ```
 
 ---
@@ -112,11 +122,11 @@ Los siguientes guards se registran en `AppModule` como `APP_GUARD` y se ejecutan
 
 ```mermaid
 flowchart LR
-    Request --> ThrottlerGuard --> JwtAuthGuard --> RolesGuard --> Handler
+    Request --> ThrottlerGuard --> JwtAuthGuard --> Handler
 ```
 
-| Guard | Módulo origen | Rol |
-|-------|--------------|-----|
-| `ThrottlerGuard` | `ThrottlerModule` | Rate limiting por IP |
-| `JwtAuthGuard` | `AuthModule` / `common/guards` | Valida Bearer token; respeta `@Public()` |
-| `RolesGuard` | `common/guards` | Verifica `@Roles()` contra `req.user.role` |
+| Guard | Módulo origen | Alcance | Rol |
+|-------|--------------|---------|-----|
+| `ThrottlerGuard` | `ThrottlerModule` | Global (APP_GUARD) | Rate limiting por IP |
+| `JwtAuthGuard` | `common/guards` (importado en `AppModule`) | Global (APP_GUARD) | Valida Bearer token; respeta `@Public()` |
+| `RolesGuard` | `common/guards` | **Por handler** (no es APP_GUARD) | Verifica `@Roles()` contra `req.user.role`; se aplica con `@UseGuards(RolesGuard)` en cada controlador o handler que lo necesite |

@@ -107,7 +107,11 @@ src/
 │   ├── app.config.ts            # namespace 'app': port, nodeEnv
 │   ├── database.config.ts       # namespace 'database': host, port, user, pass, name, ssl
 │   ├── jwt.config.ts            # namespace 'jwt': secrets, expirations, issuer, audience
-│   └── index.ts                 # Barrel export de las tres configuraciones
+│   ├── valkey.config.ts         # namespace 'valkey': host, port, password
+│   └── index.ts                 # Barrel export de las cuatro configuraciones
+│
+├── valkey/                      # Módulo de conexión a Valkey/Redis
+│   └── valkey.module.ts         # @Global(); provee VALKEY_CLIENT (ioredis) para blocklist JWT
 │
 └── database/
     └── migrations/              # Historial versionado de esquema
@@ -162,6 +166,11 @@ NestJS usa el contenedor de IoC de forma jerárquica. Las dependencias fluyen as
 
 ```
 AppModule
+  └─ importa ConfigModule (isGlobal: true)
+  └─ importa TypeOrmModule (forRootAsync)
+  └─ importa ThrottlerModule
+  └─ importa CacheModule (isGlobal: true) — store en memoria para uso general
+  └─ importa ValkeyModule (@Global) — provee VALKEY_CLIENT (ioredis) para blocklist JWT
   └─ importa UsersModule    → UsersService disponible en AuthModule
   └─ importa AuthModule     → consume UsersService (importado desde UsersModule)
   └─ importa PatientsModule → consume UsersService (importado desde UsersModule)
@@ -206,5 +215,6 @@ DoctorsModule  ──exporta DoctorsService──►  AppointmentsModule (valida
 | **Swagger** | `@nestjs/swagger` + `swagger-ui-express` | Documentación interactiva (solo en desarrollo) |
 | **Cookie Parser** | `cookie-parser` | Lectura de la cookie HttpOnly con el refresh token |
 | **express-basic-auth** | `express-basic-auth` | Protección básica de la ruta `/api/docs` de Swagger |
+| **Valkey / Redis** | `ioredis` | Blocklist de access tokens revocados en logout (OWASP A07:2021); fail-open si no está disponible al arrancar |
 
 No se integran servicios de correo electrónico, almacenamiento en la nube, colas de mensajes ni proveedores externos de autenticación (OAuth) en esta versión.

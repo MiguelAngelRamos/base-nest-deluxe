@@ -9,13 +9,29 @@ export default registerAs('database', () => ({
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   name: process.env.DB_NAME,
-  //* [SECURE-FIX V6] SSL ahora viene de env en lugar de estar
-  //* hardcoded en app.module.ts. En desarrollo local contra
-  //* 192.168.1.51 LAN sin certificado queda false — funciona igual.
-  //* En despliegue se activa seteando DB_SSL=true.
-  //! [PROD] DB_SSL=true en el .env de producción + el DataSource
-  //!        debe usar { rejectUnauthorized: true } contra la CA
-  //!        del proveedor (RDS/Cloud SQL/Supabase). Usar ssl:false
-  //!        con una DB pública expone credenciales y PHI clínica.
+  // DB_SSL cifra el canal TCP entre NestJS y PostgreSQL con TLS.
+  // Sin SSL, usuario, contraseña y queries viajan en texto plano.
+  //
+  // DB_SSL=false  → desarrollo local en LAN (192.168.1.51).
+  //                 El Postgres local no tiene certificado; false es correcto.
+  // DB_SSL=true   → producción en la nube (RDS, Supabase, Cloud SQL, etc.).
+  //                 La conexión cruza internet: cifrado obligatorio.
+  //
+  //! En prod también configurar { rejectUnauthorized: true } en el DataSource
+  //! para validar el certificado del proveedor y evitar ataques MITM.
+  //
+  // CÓMO FUNCIONA ESTA LÍNEA:
+  // process.env.DB_SSL siempre llega como STRING desde el .env ("true" o "false").
+  // El operador === 'true' convierte ese string a boolean:
+  //   .env: DB_SSL=false  →  "false" === 'true'  →  false  (SSL desactivado)
+  //   .env: DB_SSL=true   →  "true"  === 'true'  →  true   (SSL activado)
+  // Es un conversor, no una asignación. El .env es quien manda.
+
+  // DB_SSL llega del .env siempre como STRING ("true" o "false"), nunca como boolean.
+  // El operador === 'true' convierte ese string a boolean real que TypeORM entiende:
+  //   .env: DB_SSL=false  →  "false" === 'true'  →  false  (SSL desactivado)
+  //   .env: DB_SSL=true   →  "true"  === 'true'  →  true   (SSL activado)
+  // database.config.ts nunca decide el valor — solo lee y transforma.
+  // El .env es la única fuente de verdad.
   ssl: process.env.DB_SSL === 'true',
 }));

@@ -1,0 +1,89 @@
+# =============================================================================
+#  .dockerignore — qué NO se copia al contexto de build
+# =============================================================================
+#  Reduce el tamaño del contexto enviado al daemon Docker, acelera los builds
+#  y, sobre todo, evita filtrar secretos (.env, claves, dumps) o pisar
+#  artefactos (node_modules del host con binarios de otra arquitectura).
+#
+#  Regla de oro: por defecto incluir poco, ir excluyendo agresivo.
+# =============================================================================
+
+# ---- Dependencias y artefactos de build (se reconstruyen dentro del contenedor)
+node_modules
+dist
+build
+.pnpm-store
+coverage
+.nyc_output
+*.tsbuildinfo
+
+# ---- Control de versiones e historial
+.git
+.gitignore
+.gitattributes
+.github
+
+# ---- Variables de entorno y secretos (NUNCA dentro de la imagen)
+#      Los secretos se inyectan en runtime vía docker run --env-file,
+#      docker secrets, o el orquestador (k8s, ECS, etc.).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+
+# ---- Logs y temporales
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+.tmp
+.temp
+.cache
+
+# ---- Tests (no se ejecutan en la imagen final de producción)
+test
+**/*.spec.ts
+**/*.e2e-spec.ts
+jest.config.*
+test/jest-e2e.json
+
+# ---- Documentación y zips locales
+doc
+*.md
+!README.md
+*.zip
+*.tar
+*.tar.gz
+
+# ---- IDEs y herramientas locales
+.vscode
+.idea
+.cursor
+.claude
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---- Linters y formatters (no se necesitan en runtime)
+.eslintcache
+.prettierrc
+.prettierignore
+eslint.config.*
+
+# ---- Docker meta (evita recursión)
+Dockerfile
+Dockerfile.*
+.dockerignore
+docker-compose*.yml
+compose*.yaml
+
+# ---- CI / scripts locales
+.husky
+.editorconfig
