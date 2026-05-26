@@ -76,7 +76,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Jest (with coverage)
-        run: pnpm test --coverage --ci
+        # Llamada directa al binario para evitar diferencias de forwarding de
+        # flags entre pnpm 9 (script-level --) y pnpm 10 (`--` literal).
+        run: pnpm exec jest --coverage --ci
 
       - name: Upload coverage artifact
         if: always()
@@ -141,8 +143,22 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: pnpm audit (JSON report)
-        run: pnpm audit --audit-level=high --prod --json > pnpm-audit.json
-        continue-on-error: false
+        # pnpm 9 audit retorna exit 1 ante cualquier vuln (ignora --audit-level
+        # en el exit code; solo filtra el output). Capturamos el JSON sin
+        # bloquear y aplicamos el umbral nosotros mismos sobre el summary.
+        # Formato pnpm v6 npm audit: { advisories: { <id>: { severity, module_name, ... } } }.
+        run: |
+          set +e
+          pnpm audit --prod --json > pnpm-audit.json
+          set -e
+          HIGH=$(jq '(.metadata.vulnerabilities.high // 0) + (.metadata.vulnerabilities.critical // 0)' pnpm-audit.json)
+          TOTAL=$(jq '(.metadata.vulnerabilities | [.info, .low, .moderate, .high, .critical] | map(. // 0) | add) // 0' pnpm-audit.json)
+          echo "Total advisories: $TOTAL — high/critical: $HIGH"
+          if [ "$HIGH" -gt 0 ]; then
+            echo "::error::Found $HIGH high/critical vulnerabilities in production dependencies"
+            jq '[ .advisories | to_entries[] | select(.value.severity == "high" or .value.severity == "critical") | { id: .key, package: .value.module_name, severity: .value.severity, fix: .value.recommendation } ]' pnpm-audit.json
+            exit 1
+          fi
 
       - name: Upload audit report
         if: always()
