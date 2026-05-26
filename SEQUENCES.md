@@ -1,10 +1,11 @@
 # Diagramas de Secuencia — Clinic API
 
-Los tres flujos más críticos de la API son:
+Los cuatro flujos más críticos de la API son:
 
 1. **Login con emisión de tokens** — el punto de entrada de toda sesión autenticada
-2. **Refresco de token con detección de reuso** — el mecanismo de seguridad más sofisticado del sistema
-3. **Creación de cita médica con validaciones de negocio** — el flujo de dominio central
+2. **Refresco de token con detección de reuso** — rotación + detección de robo
+3. **Logout con revocación de access token vía blocklist** — invalidación en tiempo real
+4. **Creación de cita médica con validaciones de negocio** — el flujo de dominio central
 
 ---
 
@@ -57,9 +58,10 @@ sequenceDiagram
 
     AuthController->>AuthService: login(req.user)
     AuthService->>AuthService: issueTokens(userId, email, role)
-    AuthService->>JwtService: sign(payload, { secret: JWT_SECRET, expiresIn: 15m })
-    JwtService-->>AuthService: accessToken
-    AuthService->>JwtService: sign(payload, { secret: JWT_REFRESH_SECRET, expiresIn: 7d })
+    Note over AuthService: payload = { sub, email, role, jti: randomUUID() }<br/>HS256 + iss=clinic-api + aud=clinic-web
+    AuthService->>JwtService: signAsync(payload, { secret: JWT_SECRET, expiresIn: 15m, algorithm: HS256, iss, aud })
+    JwtService-->>AuthService: accessToken (con jti)
+    AuthService->>JwtService: signAsync({sub}, { secret: JWT_REFRESH_SECRET, expiresIn: 7d, algorithm: HS256, iss, aud })
     JwtService-->>AuthService: refreshToken
     AuthService->>AuthService: argon2.hash(refreshToken)
     AuthService->>UserRepo: UPDATE users SET refresh_token_hash = $1 WHERE id = $2
@@ -147,9 +149,9 @@ sequenceDiagram
 
 ---
 
-## Flujo 3: Creación de cita médica (POST /api/v1/appointments)
+## Flujo 3: Logout con revocación de access token (POST /api/v1/auth/logout)
 
-Este flujo concentra las validaciones más complejas: autenticación, RBAC, ownership del patientId, validación del doctorId y prevención de double-booking.
+Logout invalida ambos tokens: el refresh token se borra de BD (`refresh_token_hash = NULL`) y el access token se añade a la blocklist de Valkey usando su `jti` como clave, con TTL igual al tiempo restante hasta su expiración natural. La estrategia es *fail-open*: si Valkey falla, el refresh se invalida igualmente y solo el access token quedaría activo hasta su expiración corta.
 
 ```mermaid
 sequenceDiagram
@@ -157,6 +159,68 @@ sequenceDiagram
     participant ThrottlerGuard
     participant JwtAuthGuard
     participant JwtStrategy
+    participant AuthController
+    participant AuthService
+    participant JwtService
+    participant Valkey as Valkey (ioredis)
+    participant UserRepo as Repository<User>
+    participant DB as PostgreSQL
+
+    Cliente->>ThrottlerGuard: POST /api/v1/auth/logout\nAuthorization: Bearer <AT>\nCookie: refresh_token=<RT>
+    ThrottlerGuard->>JwtAuthGuard: pasa (60 rpm global)
+    JwtAuthGuard->>JwtStrategy: valida Bearer token (HS256 + iss + aud)
+    JwtStrategy->>JwtStrategy: verifica firma + expiración
+    JwtStrategy->>Valkey: GET blocklist:at:<jti>
+    alt jti ya en blocklist (token revocado previamente)
+        Valkey-->>JwtStrategy: "1"
+        JwtStrategy-->>Cliente: 401 Unauthorized (Token revocado)
+    end
+    Valkey-->>JwtStrategy: nil
+    JwtStrategy-->>JwtAuthGuard: req.user = { id, email, role }
+
+    JwtAuthGuard-->>AuthController: handler invocado
+    AuthController->>AuthController: Extrae Bearer del header Authorization
+    AuthController->>AuthService: logout(userId, accessToken)
+
+    AuthService->>JwtService: decode(accessToken) (sin verificar firma — ya validada por el guard)
+    JwtService-->>AuthService: { jti, exp, ... }
+    AuthService->>AuthService: ttl = exp - now (en segundos)
+
+    alt ttl > 0
+        AuthService->>Valkey: SET blocklist:at:<jti> "1" EX <ttl>
+        alt Valkey responde error (red, timeout, no disponible)
+            Valkey-->>AuthService: error
+            AuthService->>AuthService: Logger.error (fail-open, continúa)
+        else OK
+            Valkey-->>AuthService: OK
+        end
+    end
+
+    Note over AuthService: Invalidación del refresh token en BD<br/>(independiente de Valkey — siempre ocurre)
+    AuthService->>UserRepo: UPDATE users SET refresh_token_hash = NULL WHERE id = $1
+    UserRepo->>DB: UPDATE
+    DB-->>UserRepo: OK
+    AuthService-->>AuthController: void
+
+    AuthController->>AuthController: res.clearCookie('refresh_token', { path: /api/v1/auth/refresh, ... })
+    AuthController-->>Cliente: 204 No Content
+```
+
+A partir de este momento, cualquier intento de usar el access token revocado verá la entrada en `blocklist:at:<jti>` y será rechazado por `JwtStrategy.validate()`. La entrada se auto-elimina cuando expira el TTL, sin necesidad de limpieza manual.
+
+---
+
+## Flujo 4: Creación de cita médica (POST /api/v1/appointments)
+
+Este flujo concentra las validaciones más complejas: autenticación, blocklist check, RBAC, ownership del patientId, validación del doctorId y prevención de double-booking.
+
+```mermaid
+sequenceDiagram
+    actor Cliente
+    participant ThrottlerGuard
+    participant JwtAuthGuard
+    participant JwtStrategy
+    participant Valkey as Valkey (ioredis)
     participant RolesGuard
     participant ValidationPipe
     participant AppointmentsController
@@ -174,8 +238,22 @@ sequenceDiagram
     alt Token inválido/expirado
         JwtAuthGuard-->>Cliente: 401 Unauthorized
     end
-    JwtStrategy->>JwtStrategy: extrae { sub, email, role } del payload
-    JwtStrategy-->>JwtAuthGuard: req.user = { userId, email, role }
+    JwtStrategy->>JwtStrategy: extrae { sub, email, role, jti } del payload
+    JwtStrategy->>JwtStrategy: verifica user.isActive en BD
+    alt Usuario desactivado
+        JwtStrategy-->>Cliente: 401 Unauthorized (Usuario desactivado)
+    end
+    JwtStrategy->>Valkey: GET blocklist:at:<jti>
+    alt jti en blocklist (logout previo)
+        Valkey-->>JwtStrategy: "1"
+        JwtStrategy-->>Cliente: 401 Unauthorized (Token revocado)
+    else Valkey error (fail-open)
+        Valkey-->>JwtStrategy: error
+        JwtStrategy->>JwtStrategy: Logger.error — pasa sin bloquear
+    else OK
+        Valkey-->>JwtStrategy: nil
+    end
+    JwtStrategy-->>JwtAuthGuard: req.user = { id, email, role }
 
     JwtAuthGuard->>RolesGuard: pasa con req.user
     RolesGuard->>RolesGuard: Lee @Roles() metadata del handler

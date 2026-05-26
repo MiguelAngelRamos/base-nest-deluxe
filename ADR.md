@@ -12,6 +12,9 @@
 | ADR-006 | Soft delete manual con isActive en lugar de @DeleteDateColumn | Aceptado |
 | ADR-007 | Configuración tipada con namespaces separados | Aceptado |
 | ADR-008 | Swagger protegido con Basic Auth, deshabilitado en producción | Aceptado |
+| ADR-009 | Blocklist de access tokens en Valkey con estrategia fail-open | Aceptado |
+| ADR-010 | Claim `jti` en payload JWT para revocación individual de tokens | Aceptado |
+| ADR-011 | Algorithm pinning HS256 + validación de issuer/audience + secretos ≥ 32 bytes | Aceptado |
 
 ---
 
@@ -172,3 +175,72 @@ Swagger solo se inicializa cuando `NODE_ENV === 'development'` (condición estri
 - *Positivo:* En desarrollo, el equipo tiene acceso a la documentación interactiva sin comprometer la seguridad.
 - *Negativo:* El equipo de QA o frontend no puede usar Swagger en producción para debugging; necesitarán un entorno de staging.
 - *Negativo:* Las credenciales de Swagger en `.env` son un secreto adicional a gestionar y rotar.
+
+---
+
+## ADR-009: Blocklist de access tokens en Valkey con estrategia fail-open
+
+**Estado:** Aceptado
+
+**Contexto:**
+Los access tokens JWT son válidos hasta que expiran (15 minutos por defecto). Si un usuario hace logout, el refresh token se invalida actualizando el hash en BD, pero el access token sigue siendo aceptado durante el resto de su ventana de vida. Si el token fue robado, el atacante tiene hasta 15 minutos de acceso aunque el usuario legítimo cierre sesión.
+
+**Decisión:**
+Introducir una *blocklist* de access tokens revocados implementada en **Valkey** (fork compatible con Redis) a través de `ioredis`. Al hacer logout, el `jti` del access token se almacena en Valkey con la clave `blocklist:at:<jti>` y TTL igual a los segundos restantes hasta la expiración del token. `JwtStrategy.validate()` consulta esta blocklist en cada request autenticado y rechaza el token si está presente. El módulo `ValkeyModule` se registra como `@Global()` y se inicializa con `lazyConnect: true`. Si Valkey no está disponible al arrancar, la aplicación loguea el error pero **continúa funcionando** (fail-open); si una consulta posterior falla, el guard deja pasar y registra el error. La defensa principal sigue siendo `user.isActive` — un usuario desactivado no puede usar su token aunque la blocklist esté caída.
+
+**Consecuencias:**
+
+- *Positivo:* Logout efectivo en tiempo real: el access token deja de ser válido inmediatamente, no en hasta 15 minutos.
+- *Positivo:* Las entradas en Valkey se auto-eliminan al expirar el TTL, sin necesidad de limpieza periódica.
+- *Positivo:* La estrategia fail-open evita que una caída de Valkey rompa la autenticación de toda la API; el riesgo residual está acotado por la expiración corta del access token y por `isActive`.
+- *Negativo:* Cada request autenticado añade una consulta de red a Valkey (típicamente <1 ms en LAN). Mitigable colocando Valkey en la misma red que la API.
+- *Negativo:* Fail-open implica que durante una caída de Valkey **un atacante con un token robado podría seguir usándolo aunque el usuario haya hecho logout**. La decisión de aceptar este trade-off prioriza disponibilidad sobre revocación inmediata; en entornos de alta sensibilidad podría revisarse a fail-closed.
+- *Negativo:* Añade una dependencia de infraestructura adicional al despliegue.
+
+---
+
+## ADR-010: Claim `jti` en payload JWT para revocación individual de tokens
+
+**Estado:** Aceptado
+
+**Contexto:**
+La blocklist de access tokens (ADR-009) necesita una clave única por token para poder bloquearlos individualmente sin afectar al resto. El claim `sub` (userId) bloquearía todas las sesiones del usuario; usar el token completo como clave es ineficiente y obliga a almacenar material sensible en Valkey.
+
+**Decisión:**
+Cada access token y refresh token emitido por `AuthService.issueTokens()` incluye un claim estándar `jti` (JWT ID) generado con `crypto.randomUUID()`. Este valor se incluye en `JwtPayload` y viaja firmado dentro del token. Al hacer logout, se decodifica el token (sin verificar firma, ya validada por el guard) y se extrae el `jti` para usarlo como clave en la blocklist Valkey (`blocklist:at:<jti>`).
+
+**Consecuencias:**
+
+- *Positivo:* La revocación es granular: invalidar un token no afecta a las demás sesiones del mismo usuario en otros dispositivos.
+- *Positivo:* El `jti` es opaco (UUID v4): no revela información sobre el token original ni permite reconstrucción.
+- *Positivo:* Cumple el estándar RFC 7519 (sección 4.1.7) para el claim `jti`, facilitando interoperabilidad con herramientas que ya lo entienden.
+- *Negativo:* El payload del JWT crece ~50 bytes por cada token; impacto despreciable en el tamaño total.
+- *Negativo:* `crypto.randomUUID()` requiere Node.js 14.17+ (cubierto holgadamente por el requisito Node 22 LTS del proyecto).
+
+---
+
+## ADR-011: Algorithm pinning HS256 + validación de issuer/audience + secretos ≥ 32 bytes
+
+**Estado:** Aceptado
+
+**Contexto:**
+Las implementaciones JWT mal configuradas son la causa de una clase entera de vulnerabilidades:
+
+1. **Algorithm confusion** (`alg: none`, mezcla HS/RS): si la verificación no fija el algoritmo, un atacante puede cambiarlo y forzar la firma con la clave pública o sin firma.
+2. **Token cross-issuer**: si dos servicios comparten el mismo secreto, un token emitido por uno puede colarse en el otro sin validación de `iss`/`aud`.
+3. **Secretos débiles**: un secreto corto (< 32 bytes) puede romperse mediante fuerza bruta offline si el atacante captura un solo HMAC firmado.
+
+**Decisión:**
+Tres controles complementarios aplicados de forma coordinada:
+
+- **Algoritmo pineado a HS256**: `JwtStrategy` (passport-jwt), `JwtService.signAsync()` en `issueTokens()` y `JwtService.verifyAsync()` en `/auth/refresh` declaran explícitamente `algorithms: ['HS256']` / `algorithm: 'HS256'`. Cualquier token con otro `alg` es rechazado.
+- **Issuer y audience obligatorios**: Cada token incluye `iss: 'clinic-api'` y `aud: 'clinic-web'` (configurables vía `JWT_ISSUER` / `JWT_AUDIENCE`). La verificación los exige; un token sin estos claims o con valores distintos se rechaza antes de invocar `validate()`.
+- **Secretos ≥ 32 caracteres con fail-fast**: `jwt.config.ts` valida `JWT_SECRET` y `JWT_REFRESH_SECRET` al cargar la configuración. En `NODE_ENV=production` un secreto débil **aborta el arranque**; en desarrollo emite warning para permitir trabajar con secretos placeholder.
+
+**Consecuencias:**
+
+- *Positivo:* Cierra OWASP ASVS V3.5 (algorithm confusion) y elimina la posibilidad de tokens con `alg: none`.
+- *Positivo:* Aísla los tokens del servicio: aunque otro sistema use el mismo secreto, sus tokens no son aceptados aquí.
+- *Positivo:* El fail-fast en producción evita escenarios donde la API arranca con secretos por defecto que pasaron desapercibidos en revisión.
+- *Negativo:* Los secretos deben rotarse en cada entorno (dev, staging, prod) y nunca reutilizarse; añade fricción operacional.
+- *Negativo:* Si en el futuro se decidiera migrar a algoritmos asimétricos (RS256/ES256), habría que tocar tres archivos: `jwt.strategy.ts`, `auth.service.ts` y `auth.controller.ts`. La duplicación es deliberada — `@nestjs/jwt` no siempre hereda los defaults del módulo cuando se pasan opciones custom, así que cada firma/verify los declara explícitamente.

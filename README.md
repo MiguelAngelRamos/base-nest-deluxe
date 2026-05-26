@@ -51,6 +51,16 @@ cp .env.example .env
 | `JWT_ISSUER` | Claim `iss` del JWT | `clinic-api` |
 | `JWT_AUDIENCE` | Claim `aud` del JWT | `clinic-web` |
 
+### Valkey / Redis (blocklist de access tokens)
+
+Valkey se utiliza para mantener una *blocklist* de access tokens revocados tras un logout. Cada access token incluye un claim `jti` único que se almacena con TTL igual al tiempo restante de expiración del token. `JwtStrategy` consulta esta blocklist en cada request autenticado. La estrategia es *fail-open*: si Valkey no está disponible, la aplicación arranca y opera sin la blocklist (la defensa principal sigue siendo `isActive` del usuario).
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `VALKEY_HOST` | Host del servidor Valkey/Redis | `127.0.0.1` |
+| `VALKEY_PORT` | Puerto Valkey/Redis | `6379` |
+| `VALKEY_PASSWORD` | Contraseña (opcional, dejar vacío si no aplica) | `s3cr3t` |
+
 ### CORS
 
 | Variable | Descripción | Ejemplo |
@@ -95,7 +105,7 @@ CREATE DATABASE clinic_db;
 pnpm migration:run
 ```
 
-Esto creará las tablas: `users`, `patients`, `doctors`, `specialties`, `appointments` y `doctor_specialties`.
+Esto creará las tablas: `users`, `patients`, `doctors`, `specialties`, `appointments` y `doctor_specialties`. La segunda migración (`1776700000000-AddRefreshTokenToUser`) añade la columna `refresh_token_hash` a `users` para la rotación de refresh tokens.
 
 ### 5. Iniciar en desarrollo
 
@@ -175,8 +185,10 @@ POST   /api/v1/appointments
 | Método | Ruta | Rate limit |
 |--------|------|------------|
 | `GET` | `/` | — |
-| `POST` | `/api/v1/auth/register` | 5 rpm |
+| `POST` | `/api/v1/auth/register` | 5 cada 10 min |
 | `POST` | `/api/v1/auth/login` | 5 rpm |
 | `POST` | `/api/v1/auth/refresh` | 10 rpm |
 
 El resto de endpoints requieren un `Authorization: Bearer <access_token>` válido.
+
+`POST /api/v1/auth/logout` requiere token y revoca tanto el access token (vía blocklist Valkey) como el refresh token (limpia `refresh_token_hash` en BD).

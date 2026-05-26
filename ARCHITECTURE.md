@@ -127,7 +127,7 @@ src/
 
 | Guard | Alcance | Función |
 |-------|---------|---------|
-| `JwtAuthGuard` | Global (APP_GUARD) | Valida `Authorization: Bearer <token>` en cada request; si el handler tiene `@Public()`, retorna `true` sin verificar |
+| `JwtAuthGuard` | Global (APP_GUARD) | Valida `Authorization: Bearer <token>` en cada request; delega en `JwtStrategy.validate()` que verifica `user.isActive` y consulta la blocklist `blocklist:at:<jti>` en Valkey (fail-open si Valkey no responde). Si el handler tiene `@Public()`, retorna `true` sin verificar |
 | `LocalAuthGuard` | `POST /auth/login` | Activa `LocalStrategy` de Passport para validar credenciales email/password |
 | `RolesGuard` | Por handler | Lee la metadata `@Roles()` con `Reflector` y verifica que `req.user.role` esté en la lista permitida |
 | `ThrottlerGuard` | Global (APP_GUARD) | Rate limiting por IP; límite base de 60 rpm; algunos endpoints tienen `@Throttle()` personalizado |
