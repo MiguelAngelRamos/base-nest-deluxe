@@ -9,10 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  Appointment,
-  AppointmentStatus,
-} from './entities/appointment.entity';
+import { Appointment, AppointmentStatus } from './entities/appointment.entity';
 import { Patient } from '../patients/entities/patient.entity';
 import { Doctor } from '../doctors/entities/doctor.entity';
 import { UserRole } from '../users/entities/user.entity';
@@ -22,7 +19,6 @@ import type { AuthenticatedUser } from '../common/types/authenticated-user.inter
 
 @Injectable()
 export class AppointmentsService {
-
   constructor(
     @InjectRepository(Appointment)
     private readonly appointmentRepository: Repository<Appointment>,
@@ -62,9 +58,7 @@ export class AppointmentsService {
       if (doctor && doctor.id === appointment.doctorId) return;
     }
 
-    throw new ForbiddenException(
-      'No tienes permisos para acceder a esta cita',
-    );
+    throw new ForbiddenException('No tienes permisos para acceder a esta cita');
   }
 
   private async resolvePatientIdForUser(
@@ -106,7 +100,6 @@ export class AppointmentsService {
     createAppointmentDto: CreateAppointmentDto,
     currentUser: AuthenticatedUser,
   ): Promise<Appointment> {
-
     if (createAppointmentDto.endTime <= createAppointmentDto.startTime) {
       throw new BadRequestException(
         'La hora de fin debe ser posterior a la hora de inicio',
@@ -116,9 +109,7 @@ export class AppointmentsService {
     if (currentUser.role === UserRole.PATIENT) {
       const ownPatientId = await this.resolvePatientIdForUser(currentUser);
       if (!ownPatientId || ownPatientId !== createAppointmentDto.patientId) {
-        throw new ForbiddenException(
-          'Solo puedes crear citas para ti mismo',
-        );
+        throw new ForbiddenException('Solo puedes crear citas para ti mismo');
       }
     }
 
@@ -193,10 +184,9 @@ export class AppointmentsService {
         .andWhere('appointment.startTime < :endTime', { endTime })
         .andWhere('appointment.endTime > :startTime', { startTime });
 
-    const doctorQb = baseQuery().andWhere(
-      'appointment.doctorId = :doctorId',
-      { doctorId },
-    );
+    const doctorQb = baseQuery().andWhere('appointment.doctorId = :doctorId', {
+      doctorId,
+    });
     if (excludeId) {
       doctorQb.andWhere('appointment.id != :excludeId', { excludeId });
     }
@@ -238,9 +228,17 @@ export class AppointmentsService {
     return this.appointmentRepository
       .createQueryBuilder('appointment')
       .innerJoinAndSelect('appointment.patient', 'patient')
-      .innerJoinAndSelect('patient.user', 'patientUser', 'patientUser.isActive = true')
+      .innerJoinAndSelect(
+        'patient.user',
+        'patientUser',
+        'patientUser.isActive = true',
+      )
       .innerJoinAndSelect('appointment.doctor', 'doctor')
-      .innerJoinAndSelect('doctor.user', 'doctorUser', 'doctorUser.isActive = true')
+      .innerJoinAndSelect(
+        'doctor.user',
+        'doctorUser',
+        'doctorUser.isActive = true',
+      )
       .orderBy('appointment.date', 'ASC')
       .addOrderBy('appointment.startTime', 'ASC')
       .getMany();
@@ -283,17 +281,13 @@ export class AppointmentsService {
       where: { id: patientId },
     });
     if (!patient) {
-      throw new NotFoundException(
-        `Paciente con id ${patientId} no encontrado`,
-      );
+      throw new NotFoundException(`Paciente con id ${patientId} no encontrado`);
     }
 
     if (currentUser.role === UserRole.PATIENT) {
       const ownPatientId = await this.resolvePatientIdForUser(currentUser);
       if (!ownPatientId || ownPatientId !== patientId) {
-        throw new ForbiddenException(
-          'Solo puedes consultar tus propias citas',
-        );
+        throw new ForbiddenException('Solo puedes consultar tus propias citas');
       }
     }
 
@@ -342,9 +336,7 @@ export class AppointmentsService {
     if (currentUser.role === UserRole.DOCTOR) {
       const ownDoctorId = await this.resolveDoctorIdForUser(currentUser);
       if (!ownDoctorId || ownDoctorId !== doctorId) {
-        throw new ForbiddenException(
-          'Solo puedes consultar tu propia agenda',
-        );
+        throw new ForbiddenException('Solo puedes consultar tu propia agenda');
       }
     } else if (currentUser.role === UserRole.PATIENT) {
       throw new ForbiddenException(
@@ -364,9 +356,7 @@ export class AppointmentsService {
 
   async findByDate(date: string): Promise<Appointment[]> {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      throw new BadRequestException(
-        'La fecha debe tener formato YYYY-MM-DD',
-      );
+      throw new BadRequestException('La fecha debe tener formato YYYY-MM-DD');
     }
 
     // ─────────────────────────────────────────────
@@ -424,7 +414,8 @@ export class AppointmentsService {
     const newStart = updateAppointmentDto.startTime ?? appointment.startTime;
     const newEnd = updateAppointmentDto.endTime ?? appointment.endTime;
     const newDoctorId = updateAppointmentDto.doctorId ?? appointment.doctorId;
-    const newPatientId = updateAppointmentDto.patientId ?? appointment.patientId;
+    const newPatientId =
+      updateAppointmentDto.patientId ?? appointment.patientId;
 
     if (newEnd <= newStart) {
       throw new BadRequestException(

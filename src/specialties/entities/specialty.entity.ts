@@ -12,7 +12,6 @@ import { Doctor } from '../../doctors/entities/doctor.entity.js';
 
 @Entity('specialties')
 export class Specialty {
-
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 

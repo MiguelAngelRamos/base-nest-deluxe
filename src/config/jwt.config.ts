@@ -24,7 +24,7 @@ function assertSecret(name: string, value: string | undefined): string {
     if (process.env.NODE_ENV === 'production') {
       throw new Error(msg);
     }
-    // eslint-disable-next-line no-console
+
     console.warn(`[jwt.config] WARN ${msg}`);
   }
   return value ?? '';

@@ -25,7 +25,6 @@ import type { AuthenticatedUser } from '../types/authenticated-user.interface';
 // ─────────────────────────────────────────────
 @Injectable()
 export class RolesGuard implements CanActivate {
-
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {

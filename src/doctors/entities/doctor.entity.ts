@@ -18,7 +18,6 @@ import type { Appointment } from '../../appointments/entities/appointment.entity
 
 @Entity('doctors')
 export class Doctor {
-
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 

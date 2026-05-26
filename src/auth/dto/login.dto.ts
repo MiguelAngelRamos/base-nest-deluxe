@@ -8,7 +8,6 @@ import { ApiProperty } from '@nestjs/swagger';
 // no damos pistas sobre la política de contraseñas aquí para
 // no revelar a atacantes qué validaciones internas aplicamos
 export class LoginDto {
-
   @ApiProperty({
     example: 'juan.gonzalez@clinica.cl',
     description: 'Email registrado del usuario',

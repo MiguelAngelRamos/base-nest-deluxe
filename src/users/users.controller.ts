@@ -45,7 +45,6 @@ import { UserRole } from './entities/user.entity';
 @Roles(UserRole.ADMIN)
 @Controller('users')
 export class UsersController {
-
   constructor(private readonly usersService: UsersService) {}
 
   @Post()

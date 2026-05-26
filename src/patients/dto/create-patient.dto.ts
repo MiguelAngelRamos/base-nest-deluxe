@@ -14,7 +14,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Gender } from '../entities/patient.entity';
 
 export class CreatePatientDto {
-
   @ApiProperty({
     example: 'f3a1b2c4-5d6e-4f7a-8b9c-0d1e2f3a4b5c',
     description: 'UUID del usuario asociado (debe existir en users)',
@@ -32,7 +31,9 @@ export class CreatePatientDto {
   @ApiProperty({ example: 'González', description: 'Apellido del paciente' })
   @IsString()
   @IsNotEmpty({ message: 'El apellido es requerido' })
-  @Length(2, 100, { message: 'El apellido debe tener entre 2 y 100 caracteres' })
+  @Length(2, 100, {
+    message: 'El apellido debe tener entre 2 y 100 caracteres',
+  })
   lastName!: string;
 
   @ApiPropertyOptional({

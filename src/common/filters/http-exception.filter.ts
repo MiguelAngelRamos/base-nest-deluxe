@@ -26,7 +26,6 @@ interface ErrorResponseBody {
 // Así ningún error sin formato llega al cliente por accidente
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
-
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost): void {

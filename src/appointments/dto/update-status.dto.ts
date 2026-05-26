@@ -10,7 +10,6 @@ import { AppointmentStatus } from '../entities/appointment.entity';
 // ValidationPipe con forbidNonWhitelisted rechaza cualquier
 // propiedad extra automáticamente. OWASP A04: Insecure Design
 export class UpdateStatusDto {
-
   @ApiProperty({
     enum: AppointmentStatus,
     example: AppointmentStatus.CONFIRMED,

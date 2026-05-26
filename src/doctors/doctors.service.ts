@@ -15,7 +15,6 @@ import { UpdateDoctorDto } from './dto/update-doctor.dto';
 
 @Injectable()
 export class DoctorsService {
-
   // Inyectamos tres repositorios: Doctor para el CRUD propio,
   // User para validar userId y soft delete, Specialty para
   // asignar/desasignar especialidades sin pasar por otro servicio
@@ -29,7 +28,6 @@ export class DoctorsService {
   ) {}
 
   async create(createDoctorDto: CreateDoctorDto): Promise<Doctor> {
-
     // Verificamos que el userId referenciado exista
     const user = await this.userRepository.findOne({
       where: { id: createDoctorDto.userId },
@@ -134,10 +132,7 @@ export class DoctorsService {
       .getMany();
   }
 
-  async update(
-    id: string,
-    updateDoctorDto: UpdateDoctorDto,
-  ): Promise<Doctor> {
+  async update(id: string, updateDoctorDto: UpdateDoctorDto): Promise<Doctor> {
     const doctor = await this.findOne(id);
 
     if (updateDoctorDto.userId && updateDoctorDto.userId !== doctor.userId) {
@@ -214,9 +209,7 @@ export class DoctorsService {
     // Filtramos la especialidad y guardamos — TypeORM detecta el
     // cambio en la relación ManyToMany y elimina la fila en la
     // tabla intermedia automáticamente
-    doctor.specialties = doctor.specialties.filter(
-      (s) => s.id !== specialtyId,
-    );
+    doctor.specialties = doctor.specialties.filter((s) => s.id !== specialtyId);
     return this.doctorRepository.save(doctor);
   }
 

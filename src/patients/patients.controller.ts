@@ -13,12 +13,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
@@ -44,7 +39,6 @@ import type { AuthenticatedUser } from '../common/types/authenticated-user.inter
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('patients')
 export class PatientsController {
-
   constructor(private readonly patientsService: PatientsService) {}
 
   @Post()

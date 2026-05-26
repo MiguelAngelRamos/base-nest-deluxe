@@ -10,7 +10,6 @@ import { registerAs } from '@nestjs/config';
 // 'app' es el namespace — así accedes a esta config:
 // configService.get('app.port')
 export default registerAs('app', () => ({
-  
   // process.env.PORT viene del archivo .env
   // El operador || define un valor por defecto
   // Si PORT no está definido, usa 3000

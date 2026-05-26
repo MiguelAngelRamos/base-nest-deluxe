@@ -15,16 +15,15 @@ import { Doctor } from '../../doctors/entities/doctor.entity';
 // El enum define los estados posibles de una cita
 // Refleja el ciclo de vida real de una cita médica
 export enum AppointmentStatus {
-  SCHEDULED = 'scheduled',   // agendada — estado inicial
-  CONFIRMED = 'confirmed',   // confirmada por el médico
-  CANCELLED = 'cancelled',   // cancelada por paciente o médico
-  COMPLETED = 'completed',   // atención finalizada
-  NO_SHOW = 'no_show',       // paciente no se presentó
+  SCHEDULED = 'scheduled', // agendada — estado inicial
+  CONFIRMED = 'confirmed', // confirmada por el médico
+  CANCELLED = 'cancelled', // cancelada por paciente o médico
+  COMPLETED = 'completed', // atención finalizada
+  NO_SHOW = 'no_show', // paciente no se presentó
 }
 
 @Entity('appointments')
 export class Appointment {
-
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 

@@ -27,7 +27,6 @@ import { AuthModule } from './auth/auth.module';
     // ConfigModule es el módulo oficial de NestJS para
     // gestionar variables de entorno
     ConfigModule.forRoot({
-
       // isGlobal: true — hace que ConfigModule esté disponible
       // en TODOS los módulos sin necesidad de importarlo
       // en cada uno — lo registramos una sola vez aquí
@@ -54,7 +53,6 @@ import { AuthModule } from './auth/auth.module';
     // Si usáramos forRoot() en lugar de forRootAsync()
     // las variables aún no estarían disponibles — error silencioso
     TypeOrmModule.forRootAsync({
-
       // inject le dice a NestJS qué dependencias inyectar
       // en la función useFactory
       inject: [ConfigService],
@@ -62,7 +60,6 @@ import { AuthModule } from './auth/auth.module';
       // useFactory es una función que retorna la configuración
       // NestJS la llama automáticamente con ConfigService inyectado
       useFactory: (configService: ConfigService) => ({
-
         // Tipo de base de datos
         type: 'postgres',
 
@@ -161,4 +158,4 @@ import { AuthModule } from './auth/auth.module';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

@@ -7,7 +7,6 @@ import { AuthService } from '../auth.service';
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
-
   constructor(private readonly authService: AuthService) {
     // Por defecto passport-local espera los campos 'username' y
     // 'password'. Renombramos username → email porque nuestra

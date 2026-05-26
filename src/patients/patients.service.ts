@@ -16,7 +16,6 @@ import type { AuthenticatedUser } from '../common/types/authenticated-user.inter
 
 @Injectable()
 export class PatientsService {
-
   constructor(
     @InjectRepository(Patient)
     private readonly patientRepository: Repository<Patient>,
@@ -67,11 +66,8 @@ export class PatientsService {
     createPatientDto: CreatePatientDto,
     currentUser: AuthenticatedUser,
   ): Promise<Patient> {
-
     if (currentUser.role === UserRole.DOCTOR) {
-      throw new ForbiddenException(
-        'Los médicos no pueden crear pacientes',
-      );
+      throw new ForbiddenException('Los médicos no pueden crear pacientes');
     }
 
     if (
@@ -184,10 +180,7 @@ export class PatientsService {
     const patient = await this.findOne(id, currentUser);
     this.assertCanWrite(currentUser, patient);
 
-    if (
-      updatePatientDto.userId &&
-      updatePatientDto.userId !== patient.userId
-    ) {
+    if (updatePatientDto.userId && updatePatientDto.userId !== patient.userId) {
       throw new ConflictException(
         'No se puede cambiar el userId de un paciente existente',
       );

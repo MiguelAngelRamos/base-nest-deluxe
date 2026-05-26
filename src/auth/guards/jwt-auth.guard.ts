@@ -13,7 +13,6 @@ import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 //    en el futuro sin tocar todos los controladores
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-
   //* [SECURE-FIX V4] Reflector inyectado para leer el metadata que
   //* deja el decorador @Public(). Al registrar este guard como
   //* APP_GUARD, todos los endpoints exigen JWT por defecto — los

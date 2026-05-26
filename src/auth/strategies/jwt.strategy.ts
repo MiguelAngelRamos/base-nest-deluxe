@@ -1,6 +1,11 @@
 // src/auth/strategies/jwt.strategy.ts
 
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -21,7 +26,6 @@ export interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-
   private readonly logger = new Logger(JwtStrategy.name);
 
   constructor(
@@ -77,7 +81,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // no puede usar su token aunque la blocklist esté caída.
     // OWASP A09:2021 — registrar el fallo para alertar si es recurrente.
     try {
-      const blocked = await this.valkeyClient.get(`blocklist:at:${payload.jti}`);
+      const blocked = await this.valkeyClient.get(
+        `blocklist:at:${payload.jti}`,
+      );
       if (blocked) {
         throw new UnauthorizedException('Token revocado');
       }

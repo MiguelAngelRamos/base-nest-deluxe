@@ -15,7 +15,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 // @Injectable() marca esta clase como un proveedor inyectable
 @Injectable()
 export class UsersService {
-
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -34,7 +33,6 @@ export class UsersService {
   //   que un caller olvidara hashear.
   // ─────────────────────────────────────────────
   async create(createUserDto: CreateUserDto): Promise<User> {
-
     const existingUser = await this.userRepository.findOne({
       where: { email: createUserDto.email },
     });

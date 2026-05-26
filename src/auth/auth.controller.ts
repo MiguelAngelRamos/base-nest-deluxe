@@ -52,7 +52,6 @@ const REFRESH_COOKIE_PATH = '/api/v1/auth/refresh';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-
   constructor(
     private readonly authService: AuthService,
     private readonly jwtService: JwtService,
@@ -144,7 +143,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Renovar access token con refresh token' })
   @ApiResponse({ status: 200, description: 'Token renovado' })
-  @ApiResponse({ status: 401, description: 'Refresh token inválido o expirado' })
+  @ApiResponse({
+    status: 401,
+    description: 'Refresh token inválido o expirado',
+  })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -152,9 +154,7 @@ export class AuthController {
     // Leemos el refresh desde la cookie HttpOnly — NUNCA del body
     // ni del header. La cookie con sameSite: strict evita CSRF
     // OWASP A01:2021 — Broken Access Control
-    const cookies = (req as Request & {
-      cookies?: Record<string, string>;
-    }).cookies;
+    const cookies = req.cookies as Record<string, string> | undefined;
     const refreshToken = cookies?.[REFRESH_COOKIE];
 
     if (!refreshToken) {
@@ -204,8 +204,11 @@ export class AuthController {
   ) {
     // Extraemos el Bearer para pasarlo a la blocklist de Valkey.
     // El guard ya verificó su validez — aquí solo lo parseamos.
-    const authHeader = (req.headers as Record<string, string>)['authorization'] ?? '';
-    const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    const authHeader =
+      (req.headers as Record<string, string>)['authorization'] ?? '';
+    const accessToken = authHeader.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : '';
 
     await this.authService.logout(req.user.id, accessToken);
     //* [SECURE-FIX V5] clearCookie replica TODOS los flags con los

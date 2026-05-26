@@ -32,7 +32,6 @@ export interface AuthTokens {
 
 @Injectable()
 export class AuthService {
-
   // Logger con contexto del servicio — facilita filtrar logs
   // por módulo en producción. OWASP A09: Security Logging
   private readonly logger = new Logger(AuthService.name);
@@ -174,7 +173,9 @@ export class AuthService {
   async logout(userId: string, accessToken: string): Promise<void> {
     // decode() no verifica firma — solo extrae el payload. El token
     // ya fue validado por JwtAuthGuard antes de llegar aquí.
-    const decoded = this.jwtService.decode<{ jti?: string; exp?: number }>(accessToken);
+    const decoded = this.jwtService.decode<{ jti?: string; exp?: number }>(
+      accessToken,
+    );
 
     if (decoded?.jti && decoded?.exp) {
       // TTL = segundos hasta expiración natural del token.
@@ -184,7 +185,12 @@ export class AuthService {
       if (ttl > 0) {
         try {
           // key namespaced para evitar colisiones con otras claves de Valkey
-          await this.valkeyClient.set(`blocklist:at:${decoded.jti}`, '1', 'EX', ttl);
+          await this.valkeyClient.set(
+            `blocklist:at:${decoded.jti}`,
+            '1',
+            'EX',
+            ttl,
+          );
         } catch (err) {
           // Fail-open: el refresh se invalida igual; solo el access token
           // quedará activo hasta su expiración natural. OWASP A09:2021.

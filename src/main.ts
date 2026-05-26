@@ -71,7 +71,6 @@ async function bootstrap() {
   //!        otro valor activa Swagger con Basic Auth débil por
   //!        defecto y expone la documentación.
   if (process.env.NODE_ENV === 'development') {
-
     // Basic Auth sobre Swagger — aunque sea dev, la red interna
     // puede estar compartida y cualquiera podría navegar a /api/docs
     app.use(
@@ -89,7 +88,7 @@ async function bootstrap() {
       .setTitle('Clinic API')
       .setDescription(
         'API RESTful para gestión de clínica médica. ' +
-        'Implementa OWASP Top 10 2025.',
+          'Implementa OWASP Top 10 2025.',
       )
       .setVersion('1.0')
       .addBearerAuth(
@@ -97,7 +96,8 @@ async function bootstrap() {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'Ingresa el Access Token JWT obtenido en POST /auth/login',
+          description:
+            'Ingresa el Access Token JWT obtenido en POST /auth/login',
         },
         'access-token',
       )
@@ -118,4 +118,4 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000);
 }
 
-bootstrap();
+void bootstrap();

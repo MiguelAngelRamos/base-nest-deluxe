@@ -22,7 +22,6 @@ import { ApiProperty } from '@nestjs/swagger';
 //   y si se configura forbidNonWhitelisted rechaza la petición.
 // ─────────────────────────────────────────────
 export class RegisterDto {
-
   @ApiProperty({
     example: 'juan.gonzalez@clinica.cl',
     description: 'Email único del usuario',

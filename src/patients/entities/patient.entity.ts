@@ -22,7 +22,6 @@ export enum Gender {
 
 @Entity('patients')
 export class Patient {
-
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
@@ -83,7 +82,4 @@ export class Patient {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
-
-
-
 }

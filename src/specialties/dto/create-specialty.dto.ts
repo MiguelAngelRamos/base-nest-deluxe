@@ -1,15 +1,9 @@
 // src/specialties/dto/create-specialty.dto.ts
 
-import {
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Length,
-} from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, Length } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSpecialtyDto {
-
   @ApiProperty({
     example: 'Cardiología',
     description: 'Nombre único de la especialidad médica',

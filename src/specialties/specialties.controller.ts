@@ -42,7 +42,6 @@ import { UserRole } from '../users/entities/user.entity';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('specialties')
 export class SpecialtiesController {
-
   constructor(private readonly specialtiesService: SpecialtiesService) {}
 
   @Post()

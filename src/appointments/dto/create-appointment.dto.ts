@@ -14,7 +14,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AppointmentStatus } from '../entities/appointment.entity';
 
 export class CreateAppointmentDto {
-
   @ApiProperty({ example: 'f3a1b2c4-5d6e-4f7a-8b9c-0d1e2f3a4b5c' })
   @IsUUID('4', { message: 'El patientId debe ser un UUID válido' })
   @IsNotEmpty({ message: 'El patientId es requerido' })

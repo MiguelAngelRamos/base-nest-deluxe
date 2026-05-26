@@ -20,7 +20,6 @@ export enum UserRole {
 // El string 'users' define el nombre exacto de la tabla
 @Entity('users')
 export class User {
-
   // @PrimaryGeneratedColumn('uuid') genera un UUID v4 automáticamente
   // Usamos UUID en lugar de integer autoincremental por seguridad:
   // un ID numérico expone el volumen de registros y permite
@@ -75,7 +74,6 @@ export class User {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
 }
-
 
 /**
  * La solución correcta para entidades TypeORM

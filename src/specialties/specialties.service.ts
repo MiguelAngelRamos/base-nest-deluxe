@@ -13,14 +13,12 @@ import { UpdateSpecialtyDto } from './dto/update-specialty.dto';
 
 @Injectable()
 export class SpecialtiesService {
-
   constructor(
     @InjectRepository(Specialty)
     private readonly specialtyRepository: Repository<Specialty>,
   ) {}
 
   async create(createSpecialtyDto: CreateSpecialtyDto): Promise<Specialty> {
-
     // El nombre de la especialidad es único — verificamos antes
     // de insertar para devolver 409 con mensaje claro, en lugar
     // de un error genérico de constraint unique de PostgreSQL
@@ -71,10 +69,7 @@ export class SpecialtiesService {
 
     // Si viene un nombre nuevo verificamos que no esté en uso
     // por otra especialidad — mismo patrón que UsersService.update
-    if (
-      updateSpecialtyDto.name &&
-      updateSpecialtyDto.name !== specialty.name
-    ) {
+    if (updateSpecialtyDto.name && updateSpecialtyDto.name !== specialty.name) {
       const existing = await this.specialtyRepository.findOne({
         where: { name: updateSpecialtyDto.name },
       });
@@ -109,7 +104,7 @@ export class SpecialtiesService {
       // El cliente debe desasignar los médicos primero
       throw new ConflictException(
         `No se puede eliminar la especialidad — ` +
-        `tiene ${specialty.doctors.length} médico(s) asignado(s)`,
+          `tiene ${specialty.doctors.length} médico(s) asignado(s)`,
       );
     }
 
